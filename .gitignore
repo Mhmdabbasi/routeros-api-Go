@@ -1,0 +1,48 @@
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+vendor/
+go.work
+go.sum
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+*.log
+
+# Build
+build/
+dist/
+
+# استثناء جميع ملفات Markdown
+*.md
+
+# لكن السماح بملف readme.md فقط
+!readme.md
+
+# استثناء جميع الملفات المضغوطة
+*.zip
+*.rar
+*.7z
+*.tar
+*.gz
+*.bz2
+*.xz
+
+# استثناء مجلد docs بالكامل
+/docs/
