@@ -3,26 +3,31 @@ package routeros
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"net"
 	"time"
 )
 
-// API is the main RouterOS API client providing access to all resources
+// API is the main RouterOS API client. It exposes the transport client and
+// generic resource handles for common RouterOS menus.
+//
+// Specialized resources that need a dedicated operation should use the Client
+// with SendContext or a typed adapter. The legacy files under resources/ are
+// not part of the root Go package and must not be referenced here as root types.
 type API struct {
 	client *Client
 
-	// Resource handlers
-	System      *System
-	Interface   *Interface
-	IP          *IP
-	IPv6        *IPv6
-	PPP         *PPP
-	Queue       *Queue
-	Routing     *Routing
-	Tools       *Tools
-	Certificate *Certificate
-	Wireless    *Wireless
-	Log         *Log
+	System      *SystemResource
+	Interface   *BaseResource
+	IP          *BaseResource
+	IPv6        *BaseResource
+	PPP         *BaseResource
+	Queue       *BaseResource
+	Routing     *BaseResource
+	Tools       *BaseResource
+	Certificate *BaseResource
+	Wireless    *BaseResource
+	Log         *BaseResource
 }
 
 // New creates a new RouterOS API client with default configuration
@@ -51,18 +56,18 @@ func NewWithConfig(config *Config) (*API, error) {
 		client: client,
 	}
 
-	// Initialize resource handlers
-	api.System = NewSystem(client)
-	api.Interface = NewInterface(client)
-	api.IP = NewIP(client)
-	api.IPv6 = NewIPv6(client)
-	api.PPP = NewPPP(client)
-	api.Queue = NewQueue(client)
-	api.Routing = NewRouting(client)
-	api.Tools = NewTools(client)
-	api.Certificate = NewCertificate(client)
-	api.Wireless = NewWireless(client)
-	api.Log = NewLog(client)
+	// Initialize root-package resource handles.
+	api.System = NewSystemResource(client)
+	api.Interface = NewBaseResource(client, "/interface")
+	api.IP = NewBaseResource(client, "/ip/address")
+	api.IPv6 = NewBaseResource(client, "/ipv6/address")
+	api.PPP = NewBaseResource(client, "/ppp/secret")
+	api.Queue = NewBaseResource(client, "/queue/simple")
+	api.Routing = NewBaseResource(client, "/routing/route")
+	api.Tools = NewBaseResource(client, "/tool")
+	api.Certificate = NewBaseResource(client, "/certificate")
+	api.Wireless = NewBaseResource(client, "/interface/wireless")
+	api.Log = NewBaseResource(client, "/log")
 
 	return api, nil
 }
@@ -250,5 +255,5 @@ func DialTimeout(address, username, password string, timeout time.Duration) (*Cl
 
 // NetworkAddress returns the network address for the connection
 func NetworkAddress(host string, port int) string {
-	return net.JoinHostPort(host, string(rune(port)))
+	return net.JoinHostPort(host, fmt.Sprintf("%d", port))
 }

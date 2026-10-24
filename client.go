@@ -150,7 +150,7 @@ func (c *Client) connectTLS(dialer *net.Dialer) (net.Conn, error) {
 	}
 
 	// Verify connection state
-	state := conn.(*tls.Conn).ConnectionState()
+	state := conn.ConnectionState()
 	if !state.HandshakeComplete {
 		return nil, ErrTLSError
 	}
@@ -162,34 +162,31 @@ func (c *Client) connectTLS(dialer *net.Dialer) (net.Conn, error) {
 func (c *Client) login() error {
 	c.config.Logger.Debug("Starting login sequence")
 
-	// Read the first response to get the challenge
-	sentence, err := c.protocol.ReadSentence()
-	if err != nil {
-		return fmt.Errorf("failed to read login challenge: %w", err)
+	// Prevent a peer that accepts TCP but does not answer the login command
+	// from blocking Connect indefinitely. The deadline is cleared on exit so
+	// the long-lived API connection can continue normally after login.
+	timeout := c.config.ReadTimeout
+	if c.config.WriteTimeout > timeout {
+		timeout = c.config.WriteTimeout
+	}
+	if timeout <= 0 {
+		timeout = c.config.Timeout
+	}
+	if c.conn != nil && timeout > 0 {
+		if err := c.conn.SetDeadline(time.Now().Add(timeout)); err != nil {
+			return fmt.Errorf("failed to set login deadline: %w", err)
+		}
+		defer func() { _ = c.conn.SetDeadline(time.Time{}) }()
 	}
 
-	response := ParseSentence(sentence)
-	if response.Type != ResponseDone {
-		return fmt.Errorf("unexpected response during login: %v", response.Type)
-	}
-
-	// Extract the challenge (ret field)
-	ret, ok := response.Data["ret"]
-	if !ok {
-		// RouterOS v6.43+ uses plain text login
-		return c.loginPlain()
-	}
-
-	// RouterOS pre-6.43 uses MD5 challenge-response
-	return c.loginMD5(ret)
-}
-
-// loginPlain performs plain text authentication (RouterOS v6.43+)
-func (c *Client) loginPlain() error {
-	c.config.Logger.Debug("Using plain text authentication")
-
-	err := c.protocol.WriteSentence("/login", fmt.Sprintf("=name=%s", c.config.Username), fmt.Sprintf("=password=%s", c.config.Password))
-	if err != nil {
+	// RouterOS expects the client to send /login first. New versions accept
+	// the username/password in this first sentence; older versions respond
+	// with a challenge in "ret", which is handled below.
+	if err := c.protocol.WriteSentence(
+		"/login",
+		fmt.Sprintf("=name=%s", c.config.Username),
+		fmt.Sprintf("=password=%s", c.config.Password),
+	); err != nil {
 		return fmt.Errorf("failed to send login credentials: %w", err)
 	}
 
@@ -203,11 +200,17 @@ func (c *Client) loginPlain() error {
 		return ErrAuthenticationFailed
 	}
 
+	if ret, ok := response.Data["ret"]; ok {
+		// RouterOS versions using legacy challenge-response return the
+		// challenge even when the first login sentence contains credentials.
+		return c.loginMD5(ret)
+	}
+
 	if response.Type != ResponseDone {
 		return fmt.Errorf("unexpected response during login: %v", response.Type)
 	}
 
-	c.config.Logger.Debug("Plain text authentication successful")
+	c.config.Logger.Debug("Login successful")
 	return nil
 }
 
