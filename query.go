@@ -1,7 +1,7 @@
 package routeros
 
 import (
-	"fmt"
+	"context"
 	"strings"
 )
 
@@ -208,13 +208,14 @@ func (q *QueryBuilder) Build() []string {
 
 // Execute runs the query on the given client
 func (q *QueryBuilder) Execute(client *Client) ([]*Response, error) {
-	return client.Send(q.Build()...)
+	words := q.Build()
+	return client.Send(words[0], words[1:]...)
 }
 
 // ExecuteContext runs the query with context on the given client
-func (q *QueryBuilder) ExecuteContext(ctx interface{}, client *Client) ([]*Response, error) {
+func (q *QueryBuilder) ExecuteContext(ctx context.Context, client *Client) ([]*Response, error) {
 	words := q.Build()
-	return client.Send(words[0], words[1:]...)
+	return client.SendContext(ctx, words[0], words[1:]...)
 }
 
 // String returns the query as a string for debugging
