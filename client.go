@@ -150,7 +150,7 @@ func (c *Client) connectTLS(dialer *net.Dialer) (net.Conn, error) {
 	}
 
 	// Verify connection state
-	state := conn.(*tls.Conn).ConnectionState()
+	state := conn.ConnectionState()
 	if !state.HandshakeComplete {
 		return nil, ErrTLSError
 	}
