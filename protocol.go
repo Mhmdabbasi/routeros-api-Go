@@ -272,7 +272,14 @@ func ParseWord(word string) Word {
 
 	case word[0] == '.':
 		w.Type = WordTypeAPIAttribute
-		w.Value = word
+		// API attributes such as ".tag=123" must expose their key and value
+		// so ParseSentence can route tagged responses to the waiting request.
+		if idx := bytes.IndexByte([]byte(word[1:]), '='); idx >= 0 {
+			w.Key = word[1 : idx+1]
+			w.Value = word[idx+2:]
+		} else {
+			w.Value = word
+		}
 
 	case word[0] == '<' || word[0] == '>' || word[0] == '-':
 		w.Type = WordTypeQuery
